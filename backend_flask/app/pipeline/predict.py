@@ -8,7 +8,7 @@ from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import StandardScaler
 from app.src.exception import CustomException
 from app.src.utils import load_object
-
+import json
 class PredictPipeline:
     def __init__(self):
         pass
@@ -22,16 +22,17 @@ class PredictPipeline:
             input_details = interpreter.get_input_details()
             output_details = interpreter.get_output_details()
             input_shape = input_details[0]['shape_signature']
-            data_scaled = data_scale.reshape(input_shape[0],input_shape[1],input_shape[2])
+            features = features.astype(np.float32).reshape(input_shape[0],input_shape[1],input_shape[2])
             # Set the input tensor
-            interpreter.set_tensor(input_details[0]['index'], data_scaled)
+            interpreter.set_tensor(input_details[0]['index'], features)
 
             # Run the model
             interpreter.invoke()
 
             # Get the prediction results from the output tensor
             output_data = interpreter.get_tensor(output_details[0]['index'])
-            return output_data
+
+            return output_data.flatten().argmax().astype(int), output_data.flatten().max().astype(float)
 
         except Exception as e:
             raise CustomException(e, sys)
@@ -46,7 +47,7 @@ class JsonToDataframe:
         try:
             # Flatten data to have each value on a single level
             flattened_data = []
-            for entry in self.json_file['sample']:
+            for entry in self.json_file['samples']:
                 flattened_entry = {
                     "ax": entry["accelerometer"]["x"],
                     "ay": entry["accelerometer"]["y"],
@@ -130,24 +131,19 @@ class SignalDataPreprocessing:
 class SequenceCreation:
     def __init__(self,df):
         self.df = df   
-    def create_sequences(self, sequence_length):
+    def create_sequences(self):
         try:
-            sequences = []
 
-            for i in range(0, len(self.df) - sequence_length + 1, sequence_length):
-                # Extract a sequence from the data
-                sequence = self.df[i:(i + sequence_length)]
-                sequences.append(sequence)
-
-
-            num_batches, num_sequences, num_features = sequences.shape
-            sequences= sequences.reshape(-1,num_features)
+            print (self.df.shape)
+            df_np = np.array(self.df)
+            num_sequences, num_features = df_np.shape
+            sequences= df_np.reshape(-1,num_features)
 
             preprocessor_path = os.path.join('artifacts', 'scaler.pkl')
             preprocessor = load_object(file_path=preprocessor_path)
             data_scale = preprocessor.transform(sequences)
 
-            sequences = data_scale.reshape(num_batches, num_sequences, num_features)
+            sequences = data_scale.reshape(num_sequences, num_features)
             return np.array(sequences)
         
         except Exception as e:

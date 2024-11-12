@@ -1,10 +1,11 @@
 import os
 import sys
 import pickle
+from app.src.exception import CustomException
 
 def load_object(file_path):
     try:
-        with open('scaler.pkl', 'rb') as f:
+        with open(file_path, 'rb') as f:
             return pickle.load(f)
 
     except Exception as e:

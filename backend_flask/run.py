@@ -6,6 +6,7 @@ import sys
 import pickle
 import numpy as np
 import pandas as pd
+import json
 from scipy.signal import butter, filtfilt
 from sklearn.preprocessing import StandardScaler
 from app.src.exception import CustomException
@@ -34,15 +35,18 @@ def receive_data():
         preprocess_obj = SignalDataPreprocessing(df)
         preprocessed_df = preprocess_obj.dm()
         seq = SequenceCreation(preprocessed_df)
-        seq_df = seq.create_sequences(40)
+        seq_df = seq.create_sequences()
         pred_pipeline = PredictPipeline()
-        prediction = pred_pipeline.predict(seq_df)
-
+        predictions = pred_pipeline.predict(seq_df)
+        prediction, pred_confidence = predictions
+        pred_confidence = json.dumps(pred_confidence.item())
+        pred_map = {0: "Walking", 1: "Running", 2: "Falling" }
+        activity = pred_map[prediction]
         # Return the prediction result as JSON
-        return jsonify({"prediction": prediction}), 200
+        return jsonify({"prediction": activity, "confidence": pred_confidence}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', debug=True)
